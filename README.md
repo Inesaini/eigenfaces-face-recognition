@@ -28,6 +28,33 @@ The task: given a 64×64 grayscale face image, identify which of 40 people it sh
   C=0.1) that scored two points lower on the single test split. With 100 test samples each
   error is worth one point, so the gap is within the noise.
 
+## How it works
+
+```mermaid
+flowchart LR
+    A["Olivetti Faces<br/>400 images, 64×64"] --> B["Flatten<br/>4,096 pixels per face"]
+    B --> C["Stratified split<br/>300 train / 100 test"]
+    C --> D["PCA on training faces<br/>mean face + eigenfaces"]
+    D --> E["Project onto k eigenfaces<br/>(whitened)"]
+    E --> F1["1-NN"]
+    E --> F2["Linear SVM"]
+    D --> G["PCA, 150 components"] --> H["LDA<br/>39 discriminant axes"] --> F3["SVM<br/>Fisherfaces"]
+```
+
+1. **Each face becomes a vector.** A 64×64 image is flattened into 4,096 pixel values.
+2. **PCA learns the eigenfaces.** It is fitted on the training faces only. The mean face is
+   subtracted, and the principal components ("eigenfaces") are the directions in which faces
+   vary the most. A few dozen of them are enough to reconstruct a recognizable face.
+3. **Faces are compared in eigenface space.** Each image is replaced by its k coordinates on
+   the eigenfaces (whitened, so every component has the same scale). A 1-NN or a linear SVM
+   then predicts the person. The notebook sweeps k to find the best trade-off.
+4. **Fisherfaces add supervision.** PCA ignores the labels, so it may keep variation that
+   comes from lighting or pose rather than identity. Fisherfaces first reduce to 150 PCA
+   components, then LDA finds the 39 directions (number of people − 1) that best separate the
+   people, and an SVM classifies in that space.
+
+Everything is wrapped in scikit-learn pipelines, so PCA and LDA never see the test faces.
+
 ## What the notebook covers
 
 1. Dataset loading and exploration (400 images, 40 subjects, 10 images each)
